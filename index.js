@@ -3,7 +3,7 @@
 var fs = require('fs');
 var async = require('async');
 var xml2js = require('xml2js');
-var request = require('request');
+var axios = require('axios').default;
 var path = require('path');
 var mkdirp = require('mkdirp');
 var Dependency = require('./lib/dependency');
@@ -449,29 +449,23 @@ module.exports = function(/*options, callback*/) {
             req_options = {
               url: url,
               auth: {
-                user: username,
+                username: username,
                 password: password
               }
             };
           }
           debug('downloading ' + url);
-          var r = request(req_options);
-          r.on('response', function(response) {
-            if (response.statusCode != 200) {
-              error = new Error('download failed for ' + url + (reason ? ' (' + reason + ')' : '') + ' [status: ' + response.statusCode + ']');
+          axios.get(url, req_options).catch(err => {
+              error = err
               return callback();
-            } else {
-              var out = fs.createWriteStream(destinationFile);
-              out.on('finish', function() {
-                foundUrl = url;
-                return callback();
-              });
-              out.on('error', function(err) {
-                return callback();
-              });
-              return r.pipe(out);
-            }
-          });
+          }).then(res => {
+            fs.promises.writeFile(destinationFile, res.data).then(() => {
+              foundUrl = url;
+              return callback()
+            }).catch(() => {
+              return callback();
+            })
+          })
           repositoryIndex++;
         },
         function() {
